@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内存不足 · 三消</title>
+<style>
+  :root{
+    --paper:#e8dcc2;
+    --paper-2:#f2e8d3;
+    --paper-3:#f8f1de;
+    --ink:#1b1915;
+    --ink-2:#3b352b;
+    --ink-3:rgba(27,25,21,.55);
+    --cinnabar:#9a2f26;
+    --bronze:#7d6538;
+    --font-kai:"KaiTi","STKaiti","楷体","Songti SC",serif;
+    --font-xing:"STXingkai","华文行楷","KaiTi","STKaiti",serif;
+    --font-li:"STLiti","隶书","LiSu","KaiTi",serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 16% 16%,rgba(62,68,58,.11),transparent 46%),
+      radial-gradient(ellipse at 86% 28%,rgba(44,50,44,.10),transparent 42%),
+      radial-gradient(ellipse at 50% 6%,rgba(255,251,238,.72),transparent 55%),
+      radial-gradient(ellipse at 50% 110%,rgba(96,80,54,.36),transparent 62%),
+      var(--paper);
+    color:var(--ink);
+    font-family:var(--font-kai);
+    min-height:100vh;
+    padding:28px 18px 46px;
+    position:relative;overflow-x:hidden;
+    display:flex;flex-direction:column;align-items:center;
+  }
+  /* 竖排书法水印 */
+  .watermark{
+    position:fixed;writing-mode:vertical-rl;pointer-events:none;user-select:none;z-index:0;
+    font-family:var(--font-xing);line-height:1;letter-spacing:.16em;
+    color:rgba(32,30,24,.062);text-shadow:0 0 1px rgba(32,30,24,.06);
+  }
+  .watermark.wm-right{right:-16px;top:9%;font-size:158px;}
+  .watermark.wm-left{left:-10px;bottom:8%;font-size:104px;color:rgba(32,30,24,.048);}
+  /* 纸纹 */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
+  }
+  /* 四周做旧 */
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 140px rgba(90,72,44,.35), inset 0 0 30px rgba(90,72,44,.22);
+  }
+  .mountains{position:fixed;left:0;right:0;bottom:0;height:190px;width:100%;opacity:.18;pointer-events:none;z-index:0;}
+
+  .wrap{
+    width:min(580px,100%);position:relative;z-index:1;
+    padding:26px 26px 30px;
+    background:linear-gradient(170deg,rgba(250,243,226,.75),rgba(236,225,201,.6));
+    border:1px solid rgba(70,58,38,.42);
+    box-shadow:
+      0 0 0 4px rgba(250,243,226,.5),
+      0 0 0 5px rgba(70,58,38,.22),
+      0 14px 40px rgba(70,54,32,.18);
+  }
+  /* 回纹边饰 */
+  .wrap::before{
+    content:"";position:absolute;inset:9px;pointer-events:none;
+    border:1px solid rgba(70,58,38,.28);
+  }
+  .wrap::after{
+    content:"";position:absolute;left:9px;right:9px;top:9px;height:6px;pointer-events:none;
+    background:repeating-linear-gradient(90deg,rgba(70,58,38,.34) 0 1px,transparent 1px 7px);
+    opacity:.55;
+  }
+
+  /* 卷轴轴头 */
+  .roller{position:relative;height:11px;border-radius:6px;margin:0 -18px 20px;
+    background:linear-gradient(180deg,#7b6242,#4a3a24 52%,#8a7050);
+    box-shadow:0 3px 7px rgba(50,38,22,.4),inset 0 1px 0 rgba(255,240,210,.3);}
+  .roller::before,.roller::after{
+    content:"";position:absolute;top:50%;width:15px;height:15px;border-radius:50%;
+    transform:translateY(-50%);
+    background:radial-gradient(circle at 34% 30%,#a58a5f,#5c4729 62%,#3a2d19);
+    box-shadow:0 2px 5px rgba(40,30,18,.45);
+  }
+  .roller::before{left:-7px;}
+  .roller::after{right:-7px;}
+  .roller.bottom{margin:22px -18px 0;}
+
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 16px;}
+  .title-group{display:flex;align-items:flex-start;gap:16px;}
+  h1{
+    font-family:var(--font-xing);
+    font-size:46px;font-weight:400;letter-spacing:.12em;line-height:1.18;
+    text-shadow:0 1px 0 rgba(255,250,238,.6),0 0 1px rgba(0,0,0,.18);
+  }
+  h1 small{
+    display:block;font-family:var(--font-kai);font-size:12.5px;
+    letter-spacing:.42em;color:var(--ink-3);margin-top:8px;font-weight:400;
+  }
+  .side-verse{
+    writing-mode:vertical-rl;font-size:12.5px;letter-spacing:.4em;
+    color:var(--ink-2);opacity:.75;height:112px;
+    border-left:1px solid rgba(70,58,38,.22);padding-left:9px;margin-top:4px;
+  }
+  /* 印章 */
+  .seal{
+    width:56px;height:56px;flex:0 0 auto;
+    background:var(--cinnabar);color:#f7edda;
+    font-family:var(--font-li);font-size:23px;letter-spacing:0;
+    display:flex;align-items:center;justify-content:center;
+    transform:rotate(4deg);border-radius:3px;
+    box-shadow:0 2px 7px rgba(110,30,22,.3),inset 0 0 0 3px rgba(255,255,255,.2),inset 0 0 12px rgba(70,10,6,.35);
+    opacity:.94;
+  }
+
+  .rule{
+    font-size:12.5px;color:var(--ink-2);letter-spacing:.12em;line-height:2;
+    padding:9px 0 9px 12px;margin-bottom:6px;
+    border-left:2px solid rgba(70,58,38,.28);
+  }
+  .rule br + *{color:var(--ink-2);}
+
+  /* 状态条：仿刻本注 */
+  .status{
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    font-size:13px;color:var(--ink-2);letter-spacing:.1em;
+    border-top:1px solid rgba(70,58,38,.22);
+    border-bottom:1px solid rgba(70,58,38,.22);
+    padding:9px 2px;margin-bottom:16px;
+  }
+  .status b{font-family:var(--font-li);font-weight:400;font-size:16px;color:var(--ink);}
+  .status .dot{opacity:.4;font-size:11px;}
+  .status button{
+    margin-left:auto;font-family:var(--font-kai);font-size:12.5px;letter-spacing:.18em;
+    color:#f7edda;background:var(--cinnabar);
+    border:none;padding:6px 13px;cursor:pointer;
+    transform:rotate(-2deg);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.22),0 2px 5px rgba(110,30,22,.25);
+    transition:.25s;
+  }
+  .status button:hover{background:#ad3a2f;transform:rotate(0deg);}
+
+  /* 牌阵：木案棋盘 */
+  .board{
+    position:relative;width:516px;height:516px;margin:0 auto;padding:14px;
+    background:
+      repeating-linear-gradient(90deg,rgba(110,82,48,.10) 0 1px,transparent 1px 6px),
+      linear-gradient(150deg,#cba97a,#ab8650 46%,#8d6a3d);
+    border:1px solid rgba(58,44,28,.72);border-radius:2px;
+    box-shadow:
+      inset 0 0 0 2px rgba(255,246,224,.35),
+      inset 0 0 26px rgba(58,38,16,.42),
+      0 10px 26px rgba(60,44,24,.3);
+  }
+  .board::before{
+    content:"";position:absolute;inset:7px;pointer-events:none;
+    border:1px solid rgba(56,40,22,.3);border-radius:1px;
+  }
+  /* 四角祥云 */
+  .clouds{
+    position:absolute;left:14px;top:14px;width:486px;height:486px;
+    pointer-events:none;z-index:5;color:rgba(146,110,54,.5);opacity:.8;
+  }
+  .stage{
+    position:relative;width:486px;height:486px;
+    background:
+      repeating-linear-gradient(0deg,rgba(120,96,60,.075) 0 1px,transparent 1px 10px),
+      repeating-linear-gradient(90deg,rgba(120,96,60,.05) 0 1px,transparent 1px 30px),
+      radial-gradient(circle at 50% 46%,#f2e7cf,#e6d6b6 68%,#dcc9a4);
+    box-shadow:
+      inset 0 0 0 1px rgba(70,54,32,.38),
+      inset 0 3px 20px rgba(90,70,42,.22);
+  }
+  /* 棋盘经纬 */
+  .stage::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:
+      repeating-linear-gradient(90deg,rgba(90,74,46,.10) 0 1px,transparent 1px 54px),
+      repeating-linear-gradient(0deg,rgba(90,74,46,.10) 0 1px,transparent 1px 54px);
+    mask-image:radial-gradient(circle at 50% 50%,#000 46%,transparent 78%);
+    -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 46%,transparent 78%);
+  }
+  .stage::before{
+    content:"";position:absolute;left:50%;top:50%;width:420px;height:420px;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle,rgba(120,100,68,.10),rgba(120,100,68,.04) 55%,transparent 72%);
+    pointer-events:none;
+  }
+  .tile{
+    position:absolute;width:54px;height:54px;
+    background:
+      repeating-linear-gradient(90deg,rgba(129,96,54,.055) 0 1px,transparent 1px 7px,rgba(129,96,54,.03) 7px 8px,transparent 8px 13px),
+      linear-gradient(160deg,#faf3e2,#eedfc4 62%,#e2cfa9);
+    border:1px solid rgba(54,40,24,.62);
+    border-radius:3px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,252,242,.9),
+      inset 0 0 0 3px #faf4e4,
+      inset 0 0 0 4px rgba(166,128,54,.68),
+      inset 0 0 0 5px #f8f0dc,
+      inset 0 -7px 12px rgba(126,96,56,.1),
+      0 3px 5px rgba(56,42,24,.26);
+    display:flex;align-items:center;justify-content:center;
+    writing-mode:vertical-rl;text-orientation:upright;
+    font-family:var(--font-li);font-size:20px;letter-spacing:.04em;line-height:1.12;
+    color:#8c6826;
+    text-shadow:0 1px 0 rgba(255,250,235,.9),0 0 1px rgba(110,82,34,.35);
+    cursor:pointer;
+    transform:rotate(var(--rot,0deg));
+    transition:transform .15s,box-shadow .2s,opacity .2s,filter .2s;
+    user-select:none;
+  }
+  .tile:hover{
+    transform:rotate(var(--rot,0deg)) translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,252,242,.95),
+      inset 0 0 0 3px #faf4e4,
+      inset 0 0 0 4px rgba(186,146,66,.8),
+      inset 0 0 0 5px #f8f0dc,
+      inset 0 -7px 12px rgba(126,96,56,.1),
+      0 7px 12px rgba(56,42,24,.3);
+  }
+  .tile.blocked{cursor:default;color:rgba(40,34,26,.38);filter:saturate(.4) brightness(.86);}
+  .tile.blocked::after{
+    content:"";position:absolute;inset:0;border-radius:3px;
+    background:linear-gradient(165deg,rgba(28,25,20,.5),rgba(28,25,20,.34));
+    box-shadow:inset 0 0 9px rgba(0,0,0,.28);
+  }
+  .tile.blocked:hover{transform:rotate(var(--rot,0deg));}
+  .tile.shake{animation:shake .32s;}
+  @keyframes shake{0%,100%{transform:rotate(var(--rot,0deg)) translateX(0)}25%{transform:rotate(var(--rot,0deg)) translateX(-4px)}75%{transform:rotate(var(--rot,0deg)) translateX(4px)}}
+  .tile.taken{opacity:0;transform:scale(.5);pointer-events:none;}
+  @keyframes deal{
+    from{opacity:0;transform:rotate(var(--rot,0deg)) translateY(-14px) scale(.55);}
+    to{opacity:1;transform:rotate(var(--rot,0deg)) translateY(0) scale(1);}
+  }
+  .tile.deal{animation:deal .46s cubic-bezier(.2,.8,.3,1) backwards;}
+
+  /* 移出暂存 */
+  .hold-wrap{margin-top:12px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .hold-label,.tray-label{
+    font-size:11.5px;color:var(--ink-3);letter-spacing:.34em;
+  }
+  .tray-label b{font-family:var(--font-li);font-weight:400;font-size:13.5px;color:var(--ink);letter-spacing:.04em;}
+  .hold{
+    width:190px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:7px;
+    border:1px solid rgba(58,44,28,.52);border-radius:2px;
+    background:
+      repeating-linear-gradient(90deg,rgba(110,82,48,.09) 0 1px,transparent 1px 5px),
+      linear-gradient(155deg,#e6d3ab,#d5bd95 62%,#c9ae83);
+    box-shadow:
+      inset 0 0 0 2px rgba(250,243,226,.42),
+      inset 0 0 0 3px rgba(58,44,28,.2),
+      inset 0 3px 10px rgba(86,66,40,.2);
+  }
+  .hold .slot{height:42px;font-family:var(--font-li);font-size:15px;writing-mode:vertical-rl;text-orientation:upright;line-height:1.1;}
+  .hold .slot.filled{cursor:pointer;}
+  .hold .slot.filled:hover{background:#f5ead4;}
+
+  /* 槽：木盘 */
+  .tray-wrap{margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .tray{
+    width:420px;display:grid;grid-template-columns:repeat(8,1fr);gap:6px;
+    padding:10px;
+    border:1px solid rgba(58,44,28,.62);border-radius:3px;
+    background:
+      repeating-linear-gradient(90deg,rgba(110,82,48,.085) 0 1px,transparent 1px 5px),
+      linear-gradient(155deg,#e9d7b0,#dac29b 60%,#ceb388);
+    box-shadow:
+      inset 0 0 0 3px rgba(250,243,226,.5),
+      inset 0 0 0 4px rgba(58,44,28,.22),
+      inset 0 3px 15px rgba(90,70,42,.24),
+      0 2px 6px rgba(56,42,24,.22);
+  }
+  .slot{
+    height:46px;border:1px dashed rgba(70,54,32,.34);border-radius:2px;
+    display:flex;align-items:center;justify-content:center;
+    writing-mode:vertical-rl;text-orientation:upright;line-height:1.1;
+    font-family:var(--font-li);font-size:15px;color:var(--ink);
+    background:rgba(88,66,38,.07);
+    box-shadow:inset 0 1px 5px rgba(70,52,28,.13);
+  }
+  .slot.filled{
+    border:1px solid rgba(54,40,24,.6);border-style:solid;
+    background:
+      repeating-linear-gradient(90deg,rgba(129,96,54,.055) 0 1px,transparent 1px 7px,rgba(129,96,54,.03) 7px 8px,transparent 8px 13px),
+      linear-gradient(160deg,#faf3e2,#eedfc4 62%,#e2cfa9);
+    color:#8c6826;
+    text-shadow:0 1px 0 rgba(255,250,235,.9),0 0 1px rgba(110,82,34,.35);
+    box-shadow:
+      inset 0 1px 0 rgba(255,252,242,.9),
+      inset 0 0 0 2px #faf4e4,
+      inset 0 0 0 3px rgba(166,128,54,.62),
+      inset 0 0 0 4px #f8f0dc,
+      0 2px 4px rgba(56,42,24,.2);
+  }
+  .slot.pop{animation:pop .28s;}
+  @keyframes pop{0%{transform:scale(.55);opacity:.3}100%{transform:scale(1);opacity:1}}
+  .slot.vanish{animation:vanish .3s forwards;}
+  @keyframes vanish{to{transform:scale(.2) rotate(8deg);opacity:0}}
+
+  /* 道具：印章钮 */
+  .props{display:flex;gap:12px;margin-top:8px;}
+  .prop{
+    font-family:var(--font-kai);font-size:12.5px;letter-spacing:.14em;
+    color:#f7edda;background:var(--cinnabar);
+    border:none;padding:8px 14px;cursor:pointer;
+    border-radius:2px;transform:rotate(-1.5deg);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.2),0 2px 5px rgba(110,30,22,.24);
+    transition:.22s;
+  }
+  .prop:nth-child(2){transform:rotate(1.2deg);}
+  .prop:nth-child(3){transform:rotate(-.8deg);}
+  .prop:hover:not(:disabled){background:#ae3b30;transform:rotate(0deg);}
+  .prop:disabled{opacity:.26;filter:grayscale(.4);cursor:default;box-shadow:none;}
+  .prop small{font-family:var(--font-li);font-size:11.5px;margin-left:3px;opacity:.9;}
+
+  /* 题跋 */
+  .colophon{
+    margin-top:22px;font-size:12px;color:var(--ink-2);line-height:2.1;letter-spacing:.06em;
+    padding-left:13px;border-left:2px solid rgba(70,58,38,.24);
+  }
+  .colophon em{font-style:normal;color:var(--cinnabar);letter-spacing:.2em;margin-right:6px;}
+  .colophon .date{display:block;margin-top:6px;text-align:right;color:var(--ink-3);letter-spacing:.22em;}
+
+  /* 结束：卷轴展开 */
+  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(232,220,194,.86);backdrop-filter:blur(3px);z-index:30;}
+  .overlay.show{display:flex;animation:fadein .4s;}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+  .panel{
+    background:linear-gradient(170deg,#faf3e2,#eee0c6);
+    border:1px solid rgba(70,58,38,.5);
+    box-shadow:0 0 0 4px rgba(250,243,226,.6),0 0 0 5px rgba(70,58,38,.22),0 18px 50px rgba(50,38,22,.3);
+    padding:36px 46px 30px;text-align:center;max-width:400px;position:relative;
+    animation:unroll .5s cubic-bezier(.2,.7,.3,1);
+  }
+  @keyframes unroll{from{transform:scaleY(.35);opacity:.2}to{transform:scaleY(1);opacity:1}}
+  .panel::before,.panel::after{
+    content:"";position:absolute;left:-10px;right:-10px;height:8px;border-radius:4px;
+    background:linear-gradient(180deg,#6d5738,#4a3a24 55%,#7d6545);
+  }
+  .panel::before{top:-9px;}
+  .panel::after{bottom:-9px;}
+  .panel h2{font-family:var(--font-xing);font-size:30px;font-weight:400;letter-spacing:.2em;margin-bottom:12px;}
+  .panel p{font-size:12.5px;color:var(--ink-2);line-height:2.05;letter-spacing:.05em;}
+  .result-stats{
+    margin-top:18px;padding:11px 2px;
+    display:flex;justify-content:center;gap:24px;flex-wrap:wrap;
+    border-top:1px solid rgba(70,58,38,.25);border-bottom:1px solid rgba(70,58,38,.25);
+    font-size:12.5px;color:var(--ink-2);letter-spacing:.08em;
+  }
+  .result-stats b{font-family:var(--font-li);font-weight:400;font-size:16px;color:var(--cinnabar);margin-left:5px;letter-spacing:.02em;}
+  .panel .stamp{
+    width:52px;height:52px;margin:18px auto 0;background:var(--cinnabar);color:#f7edda;
+    font-family:var(--font-li);font-size:20px;
+    display:flex;align-items:center;justify-content:center;
+    transform:rotate(-5deg);border-radius:3px;
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.2);
+  }
+  .panel button{
+    margin-top:20px;font-family:var(--font-kai);font-size:13px;letter-spacing:.2em;
+    color:#f7edda;background:var(--cinnabar);border:none;
+    padding:8px 22px;cursor:pointer;transition:.25s;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.2);
+  }
+  .panel button:hover{background:#ae3b30;}
+
+  /* 结算：胜 · 金榜喜报 */
+  .panel .panel-tag{
+    font-family:var(--font-kai);font-size:10.5px;letter-spacing:.55em;
+    color:var(--ink-3);margin-bottom:9px;
+  }
+  .overlay.win{background:radial-gradient(circle at 50% 38%,rgba(255,242,206,.96),rgba(230,211,166,.92));}
+  .panel.win{
+    max-width:450px;
+    background:
+      radial-gradient(ellipse at 50% -12%,rgba(255,234,172,.8),transparent 58%),
+      linear-gradient(168deg,#fdf7e6,#f3e2b9 58%,#e9d29d);
+    border-color:#b08a3e;
+    box-shadow:0 0 0 4px rgba(253,247,230,.7),0 0 0 5px rgba(176,138,62,.42),0 18px 50px rgba(110,80,30,.3);
+  }
+  .panel.win::before,.panel.win::after{
+    background:linear-gradient(180deg,#d9b66c,#a97f34 52%,#e2c47e);
+  }
+  .panel.win .panel-tag{color:#9a7a36;}
+  .panel.win h2{
+    color:#7a2318;padding:10px 25px;
+    border-top:1px solid rgba(176,138,62,.55);border-bottom:1px solid rgba(176,138,62,.55);
+  }
+  .panel.win .stamp{
+    background:radial-gradient(circle at 34% 28%,#bb4631,#8d241b 72%);border-radius:50%;
+    box-shadow:inset 0 0 0 3px rgba(255,235,200,.35),0 2px 8px rgba(110,30,20,.35);
+  }
+  .panel.win button{background:linear-gradient(180deg,#ab8136,#8a6220);box-shadow:inset 0 0 0 2px rgba(255,240,205,.3);}
+  .panel.win button:hover{background:#b98c3c;}
+  .panel.win .result-stats b{color:#9a2f26;}
+
+  /* 结算：负 · 残卷冷墨 */
+  .overlay.lose{background:rgba(34,38,34,.62);backdrop-filter:blur(5px) grayscale(.45);}
+  .panel.lose{
+    max-width:360px;padding:34px 34px 26px;
+    background:
+      radial-gradient(ellipse at 74% 12%,rgba(58,64,58,.18),transparent 56%),
+      linear-gradient(168deg,#e9e9e0,#d8dad0 55%,#c9cdc2);
+    border-color:rgba(46,54,48,.58);
+    box-shadow:0 0 0 4px rgba(240,240,232,.45),0 0 0 5px rgba(46,54,48,.32),0 18px 50px rgba(24,28,24,.38);
+  }
+  .panel.lose::before,.panel.lose::after{
+    background:linear-gradient(180deg,#4a5048,#2c312c 55%,#585e54);
+  }
+  .panel.lose .panel-tag{color:#5c635a;}
+  .panel.lose h2{color:#333833;font-family:var(--font-li);letter-spacing:.3em;font-size:27px;}
+  .panel.lose .stamp{
+    background:linear-gradient(160deg,#5c635a,#343a34);color:#e6e8df;
+    box-shadow:inset 0 0 0 3px rgba(230,232,223,.16);
+  }
+  .panel.lose button{background:#4a5048;box-shadow:inset 0 0 0 2px rgba(230,232,223,.16);}
+  .panel.lose button:hover{background:#5a615a;}
+  .panel.lose .result-stats{
+    flex-direction:column;align-items:center;gap:9px;
+    border-color:rgba(46,54,48,.32);
+  }
+  .panel.lose .result-stats b{color:#3c4740;}
+
+  /* 择难 */
+  .diff-panel{max-width:470px;}
+  .diff-row{display:flex;gap:14px;justify-content:center;margin-top:24px;}
+  .diff-btn{
+    width:112px;padding:16px 8px 13px;
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    background:linear-gradient(160deg,#f8f0dc,#e8d8b7);
+    border:1px solid rgba(40,34,26,.5);border-radius:2px;color:var(--ink);
+    box-shadow:inset 0 0 0 3px #f8f0dc,inset 0 0 0 4px rgba(40,34,26,.2),0 2px 5px rgba(60,48,32,.18);
+    cursor:pointer;transition:.22s;
+  }
+  .diff-btn span{font-family:var(--font-li);font-size:23px;letter-spacing:.12em;line-height:1.1;}
+  .diff-btn small{font-size:11.5px;letter-spacing:.1em;color:var(--ink-3);}
+  .diff-btn:hover{
+    transform:translateY(-3px);border-color:var(--cinnabar);
+    box-shadow:inset 0 0 0 3px #f8f0dc,inset 0 0 0 4px rgba(154,47,38,.4),0 6px 12px rgba(60,48,32,.2);
+  }
+  .diff-btn:hover span{color:var(--cinnabar);}
+
+  /* 封面 */
+  .cover{
+    position:fixed;inset:0;z-index:40;
+    display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(ellipse at 50% 40%,rgba(250,243,226,.93),rgba(232,220,194,.96) 62%,rgba(206,190,160,.98)),
+      var(--paper);
+    transition:opacity .5s ease,visibility .5s;
+  }
+  .cover::before{
+    content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  }
+  .cover::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 160px rgba(80,62,38,.4),inset 0 0 40px rgba(80,62,38,.22);
+  }
+  .cover.hide{opacity:0;visibility:hidden;pointer-events:none;}
+  .cover-mtn{position:absolute;left:0;right:0;bottom:0;width:100%;height:200px;opacity:.13;pointer-events:none;z-index:1;}
+  .cover-inner{
+    position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:24px;
+    padding:34px 40px;
+  }
+  .cover-inner::before{
+    content:"";position:absolute;left:50%;top:42%;width:430px;height:430px;
+    transform:translate(-50%,-50%);border-radius:50%;
+    border:1px solid rgba(70,58,38,.13);
+    box-shadow:inset 0 0 70px rgba(90,72,44,.07);
+    pointer-events:none;
+  }
+  .cover-title-wrap{position:relative;display:flex;align-items:flex-start;gap:24px;}
+  .cover-title{
+    writing-mode:vertical-rl;font-family:var(--font-xing);font-weight:400;
+    font-size:102px;line-height:1.06;letter-spacing:.13em;color:var(--ink);
+    text-shadow:0 2px 0 rgba(255,250,238,.5),0 0 1px rgba(0,0,0,.2);
+  }
+  .cover-side{
+    writing-mode:vertical-rl;font-size:13px;letter-spacing:.5em;color:var(--ink-3);
+    line-height:2.4;padding-left:12px;border-left:1px solid rgba(70,58,38,.22);
+    height:286px;margin-top:14px;
+  }
+  .cover-seal{
+    position:absolute;right:-34px;top:-14px;width:54px;height:54px;
+    background:var(--cinnabar);color:#f7edda;font-family:var(--font-li);font-size:20px;
+    display:flex;align-items:center;justify-content:center;border-radius:3px;
+    transform:rotate(6deg);
+    box-shadow:0 2px 8px rgba(110,30,22,.3),inset 0 0 0 3px rgba(255,255,255,.2),inset 0 0 12px rgba(70,10,6,.3);
+  }
+  .cover-rule{width:250px;height:1px;background:linear-gradient(90deg,transparent,rgba(70,58,38,.42),transparent);}
+  .cover-meta{font-size:12.5px;letter-spacing:.42em;color:var(--ink-2);}
+  .cover-start{
+    font-family:var(--font-xing);font-size:29px;letter-spacing:.28em;
+    color:#f7edda;background:linear-gradient(160deg,#a8382c,#8a2a21);
+    border:none;padding:15px 44px 15px 50px;cursor:pointer;
+    border-radius:2px;transform:rotate(-1deg);
+    box-shadow:inset 0 0 0 3px rgba(255,240,215,.28),0 6px 16px rgba(110,30,22,.32);
+    transition:transform .25s,background .25s;
+  }
+  .cover-start:hover{transform:rotate(0deg) scale(1.04);background:#ad3a2f;}
+  .cover-foot{font-size:11.5px;letter-spacing:.3em;color:var(--ink-3);}
+  .cover-title{animation:inkIn 1s .12s backwards;}
+  .cover-side{animation:inkIn .9s .4s backwards;}
+  .cover-seal{animation:stampIn .6s .7s backwards;}
+  .cover-rule,.cover-meta{animation:riseIn .6s .78s backwards;}
+  .cover-start{animation:riseIn .6s .92s backwards,breathe 2.8s 1.6s infinite;}
+  .cover-foot{animation:riseIn .6s 1.05s backwards;}
+  @keyframes inkIn{from{opacity:0;filter:blur(6px);transform:translateY(8px);}to{opacity:1;filter:blur(0);transform:none;}}
+  @keyframes breathe{0%,100%{box-shadow:inset 0 0 0 3px rgba(255,240,215,.28),0 6px 16px rgba(110,30,22,.32);}50%{box-shadow:inset 0 0 0 3px rgba(255,240,215,.4),0 6px 24px rgba(150,42,30,.5);}}
+
+  /* 入场动效 */
+  @keyframes riseIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes winOpen{0%{opacity:0;transform:scale(.86) translateY(18px);}60%{opacity:1;transform:scale(1.02) translateY(-2px);}100%{opacity:1;transform:scale(1) translateY(0);}}
+  @keyframes loseOpen{0%{opacity:0;transform:translateY(-16px) rotate(-1.2deg) scale(.96);filter:blur(2px);}100%{opacity:1;transform:translateY(0) rotate(0) scale(1);filter:blur(0);}}
+  @keyframes stampIn{0%{opacity:0;transform:rotate(-18deg) scale(1.55);}62%{opacity:1;transform:rotate(-3deg) scale(.94);}100%{opacity:1;transform:rotate(-5deg) scale(1);}}
+  @keyframes stampSink{0%{opacity:0;transform:rotate(3deg) scale(.72);}100%{opacity:.9;transform:rotate(-5deg) scale(1);}}
+
+  .overlay.show .diff-panel h2{animation:riseIn .5s .08s backwards;}
+  .overlay.show .diff-panel p{animation:riseIn .5s .16s backwards;}
+  .overlay.show .diff-btn{animation:riseIn .5s backwards;}
+  .overlay.show .diff-btn:nth-child(1){animation-delay:.24s;}
+  .overlay.show .diff-btn:nth-child(2){animation-delay:.34s;}
+  .overlay.show .diff-btn:nth-child(3){animation-delay:.44s;}
+  .overlay.show .diff-panel .stamp{animation:stampIn .5s .56s backwards;}
+
+  .overlay.show .panel.win{animation:winOpen .62s cubic-bezier(.2,.8,.3,1);}
+  .overlay.show .panel.win .panel-tag{animation:riseIn .45s .08s backwards;}
+  .overlay.show .panel.win h2{animation:riseIn .5s .16s backwards;}
+  .overlay.show .panel.win p{animation:riseIn .5s .26s backwards;}
+  .overlay.show .panel.win .result-stats{animation:riseIn .5s .34s backwards;}
+  .overlay.show .panel.win .stamp{animation:stampIn .55s .46s backwards;}
+  .overlay.show .panel.win button{animation:riseIn .5s .56s backwards;}
+
+  .overlay.show .panel.lose{animation:loseOpen .55s ease-out;}
+  .overlay.show .panel.lose .panel-tag{animation:riseIn .45s .08s backwards;}
+  .overlay.show .panel.lose h2{animation:riseIn .5s .16s backwards;}
+  .overlay.show .panel.lose p{animation:riseIn .5s .26s backwards;}
+  .overlay.show .panel.lose .result-stats{animation:riseIn .5s .34s backwards;}
+  .overlay.show .panel.lose .stamp{animation:stampSink .5s .44s backwards;}
+  .overlay.show .panel.lose button{animation:riseIn .5s .54s backwards;}
+
+  @media (max-width:600px){
+    .wrap{padding:20px 16px 24px;}
+    h1{font-size:32px;}
+    .side-verse{display:none;}
+    .seal{width:46px;height:46px;font-size:19px;}
+    .board{transform:scale(.6);transform-origin:top center;margin-bottom:-206px;}
+    .tray{width:100%;max-width:340px;gap:4px;padding:6px;}
+    .slot{height:38px;font-size:14px;}
+    .cover-title{font-size:74px;}
+    .cover-side{display:none;}
+    .cover-seal{right:-22px;top:-10px;width:44px;height:44px;font-size:17px;}
+    .cover-inner{gap:18px;padding:24px 20px;}
+    .cover-start{font-size:24px;padding:13px 32px 13px 36px;}
+  }
+  @media (max-height:700px){
+    .cover-title{font-size:74px;}
+    .cover-side{height:210px;}
+    .cover-inner{gap:16px;padding:20px;}
+  }
+</style>
+</head>
+<body>
+
+<svg class="mountains" viewBox="0 0 1440 190" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M0,152 L120,92 L200,132 L300,66 L390,126 L500,88 L620,144 L740,104 L860,150 L980,96 L1100,138 L1220,106 L1340,150 L1440,118 L1440,190 L0,190 Z" fill="#2a2722"/>
+  <path d="M0,172 L150,144 L280,164 L420,130 L560,160 L700,136 L840,168 L980,140 L1120,170 L1260,146 L1380,172 L1440,156 L1440,190 L0,190 Z" fill="#1e1b17"/>
+</svg>
+
+<div class="watermark wm-right" aria-hidden="true">内存</div>
+<div class="watermark wm-left" aria-hidden="true">不足</div>
+
+<div class="cover" id="cover">
+  <svg class="cover-mtn" viewBox="0 0 1440 190" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0,152 L120,92 L200,132 L300,66 L390,126 L500,88 L620,144 L740,104 L860,150 L980,96 L1100,138 L1220,106 L1340,150 L1440,118 L1440,190 L0,190 Z" fill="#2a2722"/>
+    <path d="M0,172 L150,144 L280,164 L420,130 L560,160 L700,136 L840,168 L980,140 L1120,170 L1260,146 L1380,172 L1440,156 L1440,190 L0,190 Z" fill="#1e1b17"/>
+  </svg>
+  <div class="cover-inner">
+    <div class="cover-title-wrap">
+      <h1 class="cover-title">内存不足</h1>
+      <div class="cover-side">方寸之间<br>存乎一心</div>
+      <div class="cover-seal">墨</div>
+    </div>
+    <div class="cover-rule"></div>
+    <div class="cover-meta">三消 · 竹牌九十六</div>
+    <button class="cover-start" id="startBtn">开　局</button>
+    <div class="cover-foot">丙午年 · 秋　识于案前</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="roller"></div>
+
+  <header>
+    <div class="title-group">
+      <div>
+        <h1>内存不足·三消<small>方寸之间　存乎一心</small></h1>
+        <div class="rule" style="margin-top:12px">
+          牌分三层叠放，为上层所压者，不可取。<br>
+          点牌入槽，同字三枚自消；槽满八枚则败。<br>
+          鼠标悬停牌面，可观其义。
+        </div>
+      </div>
+      <div class="side-verse">观其字　知其理</div>
+    </div>
+    <div class="seal">墨</div>
+  </header>
+
+  <div class="status">
+    <div>余牌 <b id="left">96</b></div>
+    <span class="dot">◆</span>
+    <div>已消 <b id="cleared">0</b></div>
+    <span class="dot">◆</span>
+    <div>槽中 <b id="slotNum">0</b> / 8</div>
+    <span class="dot">◆</span>
+    <div>难度 <b id="diffName">—</b></div>
+    <button id="changeDiff">择难</button>
+    <button id="restart">重开</button>
+  </div>
+
+  <div class="board">
+    <svg class="clouds" viewBox="0 0 486 486" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <g id="cloudMotif" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+          <path d="M8 56c0-15 13-26 28-22 4-14 22-18 30-5 11-3 21 5 20 16"/>
+          <path d="M12 62c15-6 33-6 48 0"/>
+          <path d="M18 70c16-6 34-6 48 0"/>
+          <path d="M74 50c10-2 18 5 18 13 0 7-7 12-14 9 5-2 8-9 4-13-3-3-8-2-10 3"/>
+          <path d="M6 70c-3 7 4 13 11 9-4-1-6-6-4-9z"/>
+        </g>
+      </defs>
+      <use href="#cloudMotif" x="0" y="0"/>
+      <use href="#cloudMotif" transform="translate(486,0) scale(-1,1)"/>
+      <use href="#cloudMotif" transform="translate(0,486) scale(1,-1)"/>
+      <use href="#cloudMotif" transform="translate(486,486) scale(-1,-1)"/>
+    </svg>
+    <div class="stage" id="stage"></div>
+  </div>
+
+  <div class="hold-wrap">
+    <div class="hold-label">移出暂存 · 点之归槽</div>
+    <div class="hold" id="hold"></div>
+  </div>
+
+  <div class="tray-wrap">
+    <div class="tray-label">方寸之槽 · 均消每组 <b id="avgTime">—</b></div>
+    <div class="tray" id="tray"></div>
+    <div class="props">
+      <button class="prop" id="undo">撤销<small id="undoN">2</small></button>
+      <button class="prop" id="moveout">移出<small id="moveoutN">1</small></button>
+      <button class="prop" id="shuffleBtn">洗牌<small id="shuffleN">1</small></button>
+    </div>
+  </div>
+
+  <div class="colophon">
+    <em>题记</em>内存不足，非一日之寒：或程序久占不还，或页面文件过小，或数据溢出边界。<br>
+    局终之后，不妨开任务管理器一观，看谁在暗处吞你的内存。
+    <span class="date">丙午年 · 秋　识于案前</span>
+  </div>
+
+  <div class="roller bottom"></div>
+</div>
+
+<div class="overlay" id="diffOverlay">
+  <div class="panel diff-panel">
+    <h2>择其难易</h2>
+    <p>牌数愈多，层叠愈密；量力而择。</p>
+    <div class="diff-row">
+      <button class="diff-btn" data-diff="easy"><span>简　单</span><small>三十三张</small></button>
+      <button class="diff-btn" data-diff="medium"><span>中　等</span><small>六十九张</small></button>
+      <button class="diff-btn" data-diff="hard"><span>困　难</span><small>九十六张</small></button>
+    </div>
+    <div class="stamp">始</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <div class="panel-tag" id="ovTag"></div>
+    <h2 id="ovTitle">方寸已塞</h2>
+    <p id="ovText"></p>
+    <div class="result-stats" id="resultStats"></div>
+    <div class="stamp" id="ovStamp">困</div>
+    <button id="again">再来一局</button>
+  </div>
+</div>
+
+<script>
+const TYPES = ['内存','虚拟','泄漏','溢出','页面','换页','崩溃','扩容','碎片','交换','栈堆','对齐','缓存','分页','映射','带宽'];
+const DEFS = {
+  '内存':'直接与 CPU 交换数据的工作区，断电即失',
+  '虚拟':'用硬盘空间扩展出来的“假内存”',
+  '泄漏':'程序占用内存后不归还，占用越跑越高',
+  '溢出':'写入的数据超出了分配好的空间边界',
+  '页面':'内存与磁盘之间搬运数据的单位',
+  '换页':'系统频繁读写磁盘搬页，表现为卡顿',
+  '崩溃':'内存耗尽时进程被强制终止',
+  '扩容':'加装内存条或调整页面文件',
+  '碎片':'空闲内存被切碎，大块申请反而失败',
+  '交换':'把不常用的页换到磁盘 swap 区',
+  '栈堆':'函数调用用栈，动态分配用堆',
+  '对齐':'数据按字节边界存放，访问更快',
+  '缓存':'命中 CPU 高速缓存，无需访问内存',
+  '分页':'把内存切成固定大小的页来管理',
+  '映射':'把文件映射进进程的地址空间',
+  '带宽':'单位时间内内存能传输的数据量'
+};
+const DIFFS = {
+  easy:   {name:'简单', tiles:33, layers:[18,10,5]},
+  medium: {name:'中等', tiles:69, layers:[36,21,12]},
+  hard:   {name:'困难', tiles:96, layers:[48,32,16]}
+};
+const CAP = 8;
+const CELL = 54;
+
+const stage = document.getElementById('stage');
+const trayEl = document.getElementById('tray');
+const leftEl = document.getElementById('left');
+const clearedEl = document.getElementById('cleared');
+const slotNumEl = document.getElementById('slotNum');
+const diffNameEl = document.getElementById('diffName');
+const diffOverlay = document.getElementById('diffOverlay');
+const avgTimeEl = document.getElementById('avgTime');
+const overlay = document.getElementById('overlay');
+
+let difficulty = 'hard';
+let tiles = [], tray = [], locked = false, cleared = 0;
+let props = {undo:2, moveout:1, shuffle:1};
+let pickHistory = [];
+let holdTiles = [];
+let startTime = 0, clearGroups = 0;
+
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function pickCells(count, cols, rows, offsetX, offsetY, used){
+  const pool = [];
+  const cx = (cols-1)/2, cy = (rows-1)/2;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const key = c+','+r;
+      if(used.has(key)) continue;
+      const d = Math.hypot(c-cx, r-cy) / Math.hypot(cx, cy);
+      const weight = Math.max(0.25, 1 - d*0.85);
+      pool.push({c, r, w:weight, key});
+    }
+  }
+  const picked = [];
+  while(picked.length < count && pool.length){
+    let total = pool.reduce((s,p)=>s+p.w,0);
+    let x = Math.random()*total, idx = 0;
+    for(; idx<pool.length; idx++){ x -= pool[idx].w; if(x<=0) break; }
+    const cell = pool.splice(Math.min(idx,pool.length-1),1)[0];
+    used.add(cell.key);
+    picked.push({x: cell.c*CELL + offsetX, y: cell.r*CELL + offsetY});
+  }
+  return picked;
+}
+
+function makeBag(total){
+  const bag = [];
+  const groups = total / 3;
+  for(let i=0;i<groups;i++){
+    const t = TYPES[i % TYPES.length];
+    bag.push(t,t,t);
+  }
+  return shuffle(bag);
+}
+
+function formatTime(sec){
+  if(sec < 60) return sec.toFixed(1) + ' 秒';
+  const m = Math.floor(sec / 60);
+  return m + ' 分 ' + (sec - m * 60).toFixed(1) + ' 秒';
+}
+
+function updateAvg(){
+  if(!clearGroups){ avgTimeEl.textContent = '—'; return; }
+  avgTimeEl.textContent = ((Date.now() - startTime) / 1000 / clearGroups).toFixed(1) + 's';
+}
+
+function build(){
+  stage.innerHTML='';
+  overlay.classList.remove('show');
+  const diff = DIFFS[difficulty];
+  tiles = []; tray = []; locked = false; cleared = 0;
+  props = {undo:2, moveout:1, shuffle:1};
+  pickHistory = [];
+  holdTiles = [];
+  startTime = Date.now();
+  clearGroups = 0;
+  avgTimeEl.textContent = '—';
+  renderHold();
+  updateProps();
+  diffNameEl.textContent = diff.name;
+  leftEl.textContent = diff.tiles;
+  clearedEl.textContent = '0';
+  slotNumEl.textContent = '0';
+  renderTray();
+
+  const layout = [];
+  const used0 = new Set(), used1 = new Set(), used2 = new Set();
+  pickCells(diff.layers[0], 9, 9, 0, 0, used0).forEach(p=>layout.push({...p, layer:0}));
+  pickCells(diff.layers[1], 8, 8, CELL/2, CELL/2, used1).forEach(p=>layout.push({...p, layer:1}));
+  pickCells(diff.layers[2], 8, 8, CELL/4, CELL/4, used2).forEach(p=>layout.push({...p, layer:2}));
+
+  const bag = makeBag(diff.tiles);
+
+  layout.forEach((p, i)=>{
+    const tile = {
+      id: i, type: bag[i], layer: p.layer, x: p.x, y: p.y,
+      removed: false, el: null
+    };
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.style.left = p.x + 'px';
+    el.style.top  = p.y + 'px';
+    el.style.zIndex = p.layer*100 + i + 10;
+    el.style.setProperty('--rot', (Math.random()*1.4 - 0.7).toFixed(2) + 'deg');
+    el.classList.add('deal');
+    el.style.animationDelay = (i * 6) + 'ms';
+    el.textContent = tile.type;
+    el.title = DEFS[tile.type] || '';
+    el.addEventListener('click', ()=> pick(tile));
+    stage.appendChild(el);
+    el.addEventListener('animationend', function clearDeal(e){
+      if(e.animationName !== 'deal') return;
+      el.classList.remove('deal');
+      el.style.animationDelay = '';
+      el.removeEventListener('animationend', clearDeal);
+    });
+    tile.el = el;
+    tiles.push(tile);
+  });
+
+  refreshBlocked();
+}
+
+function overlapRatio(a, b){
+  const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x+CELL, b.x+CELL), y2 = Math.min(a.y+CELL, b.y+CELL);
+  if(x2<=x1 || y2<=y1) return 0;
+  return ((x2-x1)*(y2-y1)) / (CELL*CELL);
+}
+
+function isBlocked(tile){
+  if(tile.removed) return true;
+  return tiles.some(o=>{
+    if(o.removed || o.layer <= tile.layer) return false;
+    return overlapRatio(tile, o) > 0.22;
+  });
+}
+
+function refreshBlocked(){
+  tiles.forEach(t=>{
+    if(t.removed) return;
+    t.el.classList.toggle('blocked', isBlocked(t));
+  });
+}
+
+function pick(tile){
+  if(locked || tile.removed) return;
+  if(isBlocked(tile)){
+    tile.el.classList.remove('shake');
+    void tile.el.offsetWidth;
+    tile.el.classList.add('shake');
+    return;
+  }
+  tile.removed = true;
+  tile.el.classList.add('taken');
+  addToTray(tile);
+  pickHistory.push(tile);
+  refreshBlocked();
+  leftEl.textContent = tiles.filter(t=>!t.removed).length;
+}
+
+function addToTray(tile){
+  const sameIdx = [];
+  tray.forEach((t,i)=>{ if(t.type===tile.type) sameIdx.push(i); });
+  const insertAt = sameIdx.length ? sameIdx[sameIdx.length-1]+1 : tray.length;
+  tray.splice(insertAt, 0, tile);
+  slotNumEl.textContent = tray.length;
+  renderTray(tile.id);
+
+  const same = tray.filter(t=>t.type===tile.type);
+  if(same.length === 3){
+    locked = true;
+    const ids = same.map(t=>t.id);
+    setTimeout(()=>{
+      document.querySelectorAll('.slot.filled').forEach(el=>{
+        if(ids.includes(Number(el.dataset.id))) el.classList.add('vanish');
+      });
+    }, 120);
+    setTimeout(()=>{
+      tray = tray.filter(t=> t.type !== tile.type);
+      cleared += 3;
+      clearGroups++;
+      updateAvg();
+      clearedEl.textContent = cleared;
+      slotNumEl.textContent = tray.length;
+      renderTray();
+      locked = false;
+      checkEnd();
+    }, 420);
+  } else {
+    checkEnd();
+  }
+}
+
+function renderTray(popId){
+  trayEl.innerHTML='';
+  tray.forEach(t=>{
+    const d = document.createElement('div');
+    d.className = 'slot filled' + (t.id===popId ? ' pop' : '');
+    d.dataset.id = t.id;
+    d.textContent = t.type;
+    d.title = DEFS[t.type] || '';
+    trayEl.appendChild(d);
+  });
+  for(let i=tray.length;i<CAP;i++){
+    const d = document.createElement('div');
+    d.className = 'slot';
+    trayEl.appendChild(d);
+  }
+  updateProps();
+}
+
+function updateProps(){
+  document.getElementById('undoN').textContent = props.undo;
+  document.getElementById('moveoutN').textContent = props.moveout;
+  document.getElementById('shuffleN').textContent = props.shuffle;
+  document.getElementById('undo').disabled = props.undo <= 0 || locked;
+  document.getElementById('moveout').disabled = props.moveout <= 0 || tray.length === 0 || locked;
+  document.getElementById('shuffleBtn').disabled = props.shuffle <= 0;
+}
+
+function returnTile(tile){
+  tile.removed = false;
+  tile.el.classList.remove('taken');
+}
+
+function doUndo(){
+  if(locked || props.undo <= 0) return;
+  let tile = null;
+  for(let i = pickHistory.length - 1; i >= 0; i--){
+    if(tray.includes(pickHistory[i])){ tile = pickHistory[i]; break; }
+  }
+  if(!tile) return;
+  tray = tray.filter(t => t !== tile);
+  returnTile(tile);
+  props.undo--;
+  refreshBlocked();
+  slotNumEl.textContent = tray.length;
+  leftEl.textContent = tiles.filter(t => !t.removed).length;
+  renderTray();
+}
+
+function doMoveOut(){
+  if(locked || props.moveout <= 0 || tray.length === 0) return;
+  const out = tray.slice(0, 3);
+  tray = tray.slice(3);
+  out.forEach(t => holdTiles.push(t));
+  props.moveout--;
+  slotNumEl.textContent = tray.length;
+  renderTray();
+  renderHold();
+}
+
+function renderHold(){
+  const el = document.getElementById('hold');
+  el.innerHTML = '';
+  holdTiles.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'slot filled';
+    d.textContent = t.type;
+    d.title = DEFS[t.type] || '点击放回槽中';
+    d.addEventListener('click', () => returnFromHold(t));
+    el.appendChild(d);
+  });
+  for(let i = holdTiles.length; i < 3; i++){
+    const d = document.createElement('div');
+    d.className = 'slot';
+    el.appendChild(d);
+  }
+}
+
+function returnFromHold(tile){
+  if(locked) return;
+  holdTiles = holdTiles.filter(t => t !== tile);
+  renderHold();
+  addToTray(tile);
+  slotNumEl.textContent = tray.length;
+}
+
+function doShuffle(){
+  if(props.shuffle <= 0) return;
+  const rem = tiles.filter(t => !t.removed);
+  const types = shuffle(rem.map(t => t.type));
+  rem.forEach((t, i) => { t.type = types[i]; t.el.textContent = t.type; t.el.title = DEFS[t.type] || ''; });
+  props.shuffle--;
+  updateProps();
+}
+
+function checkEnd(){
+  const remaining = tiles.filter(t=>!t.removed).length;
+  if(remaining === 0 && tray.length === 0 && holdTiles.length === 0){
+    finish(true);
+    return;
+  }
+  if(tray.length >= CAP){
+    finish(false);
+  }
+}
+
+function finish(win){
+  locked = true;
+  const panelTitle = document.getElementById('ovTitle');
+  const panelText = document.getElementById('ovText');
+  const stamp = document.getElementById('ovStamp');
+  const total = (Date.now() - startTime) / 1000;
+  document.getElementById('resultStats').innerHTML =
+    '<span>总耗时<b>' + formatTime(total) + '</b></span>' +
+    '<span>均消每组<b>' + (clearGroups ? formatTime(total / clearGroups) : '—') + '</b></span>';
+  overlay.querySelector('.panel').className = 'panel ' + (win ? 'win' : 'lose');
+  overlay.classList.remove('win', 'lose');
+  overlay.classList.add(win ? 'win' : 'lose');
+  document.getElementById('ovTag').textContent = win ? '喜　报' : '残　卷';
+  if(win){
+    panelTitle.textContent = '方寸已宽';
+    panelText.innerHTML = DIFFS[difficulty].tiles + ' 张牌尽数消去，<br>内存之说，已了然于胸。';
+    stamp.textContent = '圆满';
+  } else {
+    panelTitle.textContent = '方寸已塞';
+    panelText.innerHTML = '槽中八枚，三枚未成组。<br>宛如内存耗尽，只能推倒重来。';
+    stamp.textContent = '困';
+  }
+  setTimeout(()=>overlay.classList.add('show'), 260);
+}
+
+document.getElementById('undo').addEventListener('click', doUndo);
+document.getElementById('moveout').addEventListener('click', doMoveOut);
+document.getElementById('shuffleBtn').addEventListener('click', doShuffle);
+
+document.getElementById('restart').addEventListener('click', build);
+document.getElementById('again').addEventListener('click', build);
+document.getElementById('changeDiff').addEventListener('click', ()=>diffOverlay.classList.add('show'));
+diffOverlay.addEventListener('click', e=>{
+  if(e.target === diffOverlay && tiles.length) diffOverlay.classList.remove('show');
+});
+
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    difficulty = btn.dataset.diff;
+    diffOverlay.classList.remove('show');
+    build();
+  });
+});
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  document.getElementById('cover').classList.add('hide');
+  setTimeout(()=>diffOverlay.classList.add('show'), 480);
+});
+</script>
+</body>
+</html>
